@@ -1,33 +1,39 @@
-use telegram_bot::{Api, ChatId, Error as TelegramError, SendMessage};
+use teloxide::{prelude::*, types::ChatId, RequestError};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum NotificationError {
   #[error("Telegram API error: {0}")]
-  ApiError(#[from] TelegramError),
+  ApiError(#[from] RequestError),
 }
 
 #[derive(Clone)]
 pub struct TelegramNotifier {
-  api: Api,
+  bot: Bot,
   chat_id: ChatId,
 }
 
 impl TelegramNotifier {
   pub fn new(token: &str, chat_id: i64) -> Self {
     Self {
-      api: Api::new(token),
-      chat_id: ChatId::new(chat_id),
+      bot: Bot::new(token),
+      chat_id: ChatId(chat_id),
     }
   }
 
   pub async fn send_message(&self, text: &str) -> Result<(), NotificationError> {
-    let message = SendMessage::new(self.chat_id, text); // Correct way to create a message
-    self
-      .api
-      .send(message)
+    match Requester::send_message(&self.bot, self.chat_id, text)
+      .send()
       .await
-      .map_err(NotificationError::ApiError)?;
-    Ok(())
+    {
+      Ok(_) => {
+        println!("Message sent successfully!");
+        Ok(())
+      }
+      Err(err) => {
+        eprintln!("Failed to send message: {:?}", err);
+        Err(NotificationError::ApiError(err))
+      }
+    }
   }
 }

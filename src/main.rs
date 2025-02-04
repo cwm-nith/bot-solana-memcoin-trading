@@ -11,8 +11,6 @@ use crate::{
 };
 use futures::StreamExt;
 use solana_sdk::signer::keypair::Keypair;
-use std::env;
-use tokio::spawn; // Import StreamExt to use `next`
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -20,47 +18,40 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
   let config = config::Config::init();
   let notifier = TelegramNotifier::new(&config.telegram_token, config.telegram_chat_id);
-  _ = notifier
-    .send_message(&format!("Error processing transaction:"))
-    .await;
-  // // Initialize components
-  // let db = Database::new(&config.database_url).await?;
 
-  // let price_monitor = PriceMonitor::new(db.clone(), notifier.clone(), &config.helius_rpc_url);
+  // Initialize components
+  let db = Database::new(&config.database_url).await?;
 
-  // // Start price monitoring
-  // tokio::spawn(async move {
-  //   price_monitor.start_monitoring().await;
-  // });
+  let price_monitor = PriceMonitor::new(db.clone(), notifier.clone(), &config.helius_rpc_url);
 
-  // // Initialize WebSocket listener
-  // let websocket = SolanaWebsocket::new(&config.helius_ws_url, &config.helius_api_key);
-  // let stream = websocket
-  //   .listen_for_pool_creation(&config.program_id)
-  //   .await?;
+  // Start price monitoring
+  tokio::spawn(async move {
+    price_monitor.start_monitoring().await;
+  });
 
-  // let mut stream = Box::pin(stream);
+  // Initialize WebSocket listener
+  let websocket = SolanaWebsocket::new(&config.helius_ws_url, &config.helius_api_key);
+  let stream = websocket
+    .listen_for_pool_creation(&config.program_id)
+    .await?;
 
-  // while let Some(message) = stream.next().await {
-  //   println!("New transaction: {}", message);
+  let mut stream = Box::pin(stream);
 
-  //   // Process transaction
-  //   let signer = Keypair::from_base58_string(&config.private_key);
-  //   let processor = transaction_processor::TransactionProcessor::new(&config.helius_rpc_url);
+  while let Some(message) = stream.next().await {
+    println!("New transaction: {}", message);
 
-  //   let e = processor.process_transaction(&message, &signer).await;
-  //   let notifier = notifier.clone();
-  //   spawn(async move {
-  //     {
-  //       _ = notifier
-  //         .send_message(&format!(
-  //           "Error processing transaction: {}",
-  //           e.err().unwrap()
-  //         ))
-  //         .await;
-  //     }
-  //   });
-  // }
+    // Process transaction
+    let signer = Keypair::from_base58_string(&config.private_key);
+    let processor = transaction_processor::TransactionProcessor::new(&config.helius_rpc_url);
+
+    // let notifier = notifier.clone();
+    if let Err(e) = processor.process_transaction(&message, &signer).await {
+      eprintln!("Error processing transaction: {}", e);
+      notifier
+        .send_message(&format!("Error processing transaction: {}", e))
+        .await?;
+    }
+  }
 
   Ok(())
 }
