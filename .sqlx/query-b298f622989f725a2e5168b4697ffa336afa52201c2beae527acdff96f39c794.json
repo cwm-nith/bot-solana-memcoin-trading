@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            INSERT INTO tokens \n            (mint_address, balance, entry_price, fees, metadata, timestamp)\n            VALUES ($1, $2, $3, $4, $5, $6)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": []
+  },
+  "hash": "b298f622989f725a2e5168b4697ffa336afa52201c2beae527acdff96f39c794"
+}
