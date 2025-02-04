@@ -25,33 +25,34 @@ impl TransactionProcessor {
 
   pub async fn process_transaction(
     &self,
-    tx_data: &str,
-    signer: &dyn Signer,
+    _tx_data: &str,
+    _signer: &dyn Signer,
   ) -> Result<(), TransactionError> {
-    let tx: Value =
-      serde_json::from_str(tx_data).map_err(|_| TransactionError::InvalidTransaction)?;
+    // let tx: Value =
+    //   serde_json::from_str(tx_data).map_err(|_| TransactionError::InvalidTransaction)?;
 
-    // Extract required fields
-    let signature_str = tx["signature"]
-      .as_str()
-      .ok_or(TransactionError::InvalidTransaction)?;
+    // // Extract required fields
+    // let signature_str = tx["signature"]
+    //   .as_str()
+    //   .ok_or(TransactionError::InvalidTransaction)?;
 
-    let message = tx["message"]
-      .as_str()
-      .ok_or(TransactionError::InvalidTransaction)?;
+    // let message = tx["message"]
+    //   .as_str()
+    //   .ok_or(TransactionError::InvalidTransaction)?;
 
-    // Convert signature string to `Signature`
-    let signature = signature_str
-      .parse::<Signature>()
-      .map_err(|_| TransactionError::InvalidTransaction)?;
+    // // Convert signature string to `Signature`
+    // let signature = signature_str
+    //   .parse::<Signature>()
+    //   .map_err(|_| TransactionError::InvalidTransaction)?;
 
-    // Verify the signature using Solana's built-in method
-    let pubkey = signer.pubkey();
-    if !signature.verify(pubkey.as_ref(), message.as_bytes()) {
-      return Err(TransactionError::SignatureError);
-    }
+    // // Verify the signature using Solana's built-in method
+    // let pubkey = signer.pubkey();
+    // if !signature.verify(pubkey.as_ref(), message.as_bytes()) {
+    //   return Err(TransactionError::SignatureError);
+    // }
 
     // Save transaction details to database (if needed)
+    return Err(TransactionError::SignatureError);
     Ok(())
   }
 

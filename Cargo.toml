@@ -11,12 +11,12 @@ dotenv = "0.15.0"
 # sqlx = { version = "0.8.3", features = ["runtime-tokio", "tls-native-tls", "postgres", "chrono"] }
 # telegram-bot = "0.8.0"
 # tokio = { version = "1.43.0", features = ["full"] }
-tokio = { version = "1.43.0", features = ["full", "rt-multi-thread"] }
+tokio = { version = "1", features = ["full", "rt-multi-thread", "macros"] }
 tokio-tungstenite = { version = "0.26.1", features = ["native-tls"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0.138"
 reqwest = { version = "0.12.12", features = ["json"] }
-sqlx = { version = "0.8.3", features = ["sqlite", "runtime-tokio-native-tls"] }
+sqlx = { version = "0.8.3", features = ["sqlite", "runtime-tokio-native-tls", "runtime-tokio", "macros"] }
 telegram-bot = "0.8.0"
 solana-sdk = "2.1.12"
 url = "2.0"

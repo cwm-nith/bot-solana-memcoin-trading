@@ -1,3 +1,4 @@
+mod config;
 mod database;
 mod price_monitor;
 mod telegram;
@@ -10,53 +11,56 @@ use crate::{
 };
 use futures::StreamExt;
 use solana_sdk::signer::keypair::Keypair;
-use std::env; // Import StreamExt to use `next`
+use std::env;
+use tokio::spawn; // Import StreamExt to use `next`
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
   dotenv::dotenv().ok();
 
-  // Initialize components
-  let db = Database::new("sqlite:tokens.db").await?;
-  let notifier = TelegramNotifier::new(
-    &env::var("TELEGRAM_TOKEN")?,
-    env::var("TELEGRAM_CHAT_ID")?.parse()?,
-  );
+  let config = config::Config::init();
+  let notifier = TelegramNotifier::new(&config.telegram_token, config.telegram_chat_id);
+  _ = notifier
+    .send_message(&format!("Error processing transaction:"))
+    .await;
+  // // Initialize components
+  // let db = Database::new(&config.database_url).await?;
 
-  let price_monitor = PriceMonitor::new(db.clone(), notifier.clone(), &env::var("SOLANA_RPC_URL")?);
+  // let price_monitor = PriceMonitor::new(db.clone(), notifier.clone(), &config.helius_rpc_url);
 
-  // Start price monitoring
-  tokio::spawn(async move {
-    price_monitor.start_monitoring().await;
-  });
+  // // Start price monitoring
+  // tokio::spawn(async move {
+  //   price_monitor.start_monitoring().await;
+  // });
 
-  // Initialize WebSocket listener
-  let websocket = SolanaWebsocket::new(&env::var("SOLANA_WS_URL")?);
-  let stream = websocket
-    .listen_for_pool_creation(&env::var("WALLET_ADDRESS")?)
-    .await?;
+  // // Initialize WebSocket listener
+  // let websocket = SolanaWebsocket::new(&config.helius_ws_url, &config.helius_api_key);
+  // let stream = websocket
+  //   .listen_for_pool_creation(&config.program_id)
+  //   .await?;
 
-  // Pin the stream to avoid the `cannot be unpinned` error
-  let mut stream = Box::pin(stream);
-  println!("New transaction");
+  // let mut stream = Box::pin(stream);
 
-  let test = stream.next().await;
-  println!("New transaction: {}", test.unwrap());
-  // Process incoming transactions
-  while let Some(message) = stream.next().await {
-    println!("New transaction: {}", message);
+  // while let Some(message) = stream.next().await {
+  //   println!("New transaction: {}", message);
 
-    // Process transaction
-    let signer = Keypair::from_base58_string(&env::var("PRIVATE_KEY")?);
-    let processor = transaction_processor::TransactionProcessor::new(&env::var("SOLANA_RPC_URL")?);
+  //   // Process transaction
+  //   let signer = Keypair::from_base58_string(&config.private_key);
+  //   let processor = transaction_processor::TransactionProcessor::new(&config.helius_rpc_url);
 
-    if let Err(e) = processor.process_transaction(&message, &signer).await {
-      notifier
-        .send_message(&format!("Error processing transaction: {}", e))
-        .await
-        .ok();
-    }
-  }
+  //   let e = processor.process_transaction(&message, &signer).await;
+  //   let notifier = notifier.clone();
+  //   spawn(async move {
+  //     {
+  //       _ = notifier
+  //         .send_message(&format!(
+  //           "Error processing transaction: {}",
+  //           e.err().unwrap()
+  //         ))
+  //         .await;
+  //     }
+  //   });
+  // }
 
   Ok(())
 }
