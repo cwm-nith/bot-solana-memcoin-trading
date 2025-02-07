@@ -1,6 +1,7 @@
-use serde::de;
 use sqlx::{sqlite::SqlitePoolOptions, SqlitePool};
 use thiserror::Error;
+
+use crate::model::TokenRecord;
 
 #[derive(Error, Debug)]
 pub enum DatabaseError {
@@ -9,18 +10,6 @@ pub enum DatabaseError {
   #[error("Query execution error: {0}")]
   QueryError(String),
 }
-
-#[derive(sqlx::FromRow, Debug)]
-pub struct TokenRecord {
-  pub id: i64,
-  pub mint_address: String,
-  pub balance: f64,
-  pub entry_price: f64,
-  pub fees: f64,
-  pub metadata: String,
-  pub timestamp: i64,
-}
-
 #[derive(Debug, Clone)]
 pub struct Database {
   pool: SqlitePool,

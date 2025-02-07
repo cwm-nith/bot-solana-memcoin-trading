@@ -2,6 +2,8 @@ use serde_json::Value;
 use solana_sdk::signature::{Signature, Signer};
 use thiserror::Error;
 
+use crate::model::StreamMessage;
+
 #[derive(Error, Debug)]
 pub enum TransactionError {
   #[error("Invalid transaction format")]
@@ -25,7 +27,7 @@ impl TransactionProcessor {
 
   pub async fn process_transaction(
     &self,
-    _tx_data: &str,
+    tx_data: &str,
     _signer: &dyn Signer,
   ) -> Result<(), TransactionError> {
     // let tx: Value =
@@ -51,8 +53,32 @@ impl TransactionProcessor {
     //   return Err(TransactionError::SignatureError);
     // }
 
-    // Save transaction details to database (if needed)
-    return Err(TransactionError::SignatureError);
+    let data = serde_json::from_str::<StreamMessage>(tx_data).unwrap();
+
+    if let Some(params) = &data.params {
+      if let Some(result) = &params.result {
+        if let Some(value) = &result.value {
+          let log = &value.logs;
+          let signature = &value.signature;
+
+          if signature.is_none() {
+            return Err(TransactionError::SignatureError);
+          }
+
+          if let Some(logs) = log {
+            let contains_create = logs
+              .iter()
+              .find(|x| x.starts_with("Program log: initialize2: InitializeInstruction2"));
+            if contains_create.is_some() {
+              println!(
+                "Create pool transaction detected: {}",
+                serde_json::to_string(&data).unwrap()
+              );
+            }
+          }
+        }
+      }
+    }
     Ok(())
   }
 

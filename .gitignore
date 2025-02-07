@@ -1,2 +1,5 @@
 /target
 .env
+tokens.db
+tokens.db-shm
+tokens.db-wal

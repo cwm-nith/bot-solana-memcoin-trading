@@ -1,34 +1,56 @@
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use sqlx::{postgres::PgRow, prelude::*};
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct TokenData {
-  pub id: i32,
-  pub token: String,
-  pub is_sold: bool,
-  pub buy_at_price: f32,
-  pub sold_at_price: f32,
-  pub balance: f32,
-  pub fee: f32,
+// #[derive(Debug, Serialize, Deserialize)]
+// pub struct TokenData {
+//   pub id: i32,
+//   pub token: String,
+//   pub is_sold: bool,
+//   pub buy_at_price: f32,
+//   pub sold_at_price: f32,
+//   pub balance: f32,
+//   pub fee: f32,
+//   pub metadata: String,
+//   pub created_at: Option<DateTime<Utc>>,
+//   pub updated_at: Option<DateTime<Utc>>,
+// }
+
+#[derive(sqlx::FromRow, Debug)]
+pub struct TokenRecord {
+  pub id: i64,
+  pub mint_address: String,
+  pub balance: f64,
+  pub entry_price: f64,
+  pub fees: f64,
   pub metadata: String,
-  pub created_at: Option<DateTime<Utc>>,
-  pub updated_at: Option<DateTime<Utc>>,
+  pub timestamp: i64,
 }
 
-impl<'r> FromRow<'r, PgRow> for TokenData {
-  fn from_row(row: &'r PgRow) -> Result<Self, sqlx::Error> {
-    Ok(TokenData {
-      id: row.try_get("id")?,
-      token: row.try_get("token")?,
-      is_sold: row.try_get("is_sold")?,
-      buy_at_price: row.try_get("buy_at_price")?,
-      sold_at_price: row.try_get("sold_at_price")?,
-      balance: row.try_get("balance")?,
-      fee: row.try_get("fee")?,
-      metadata: row.try_get("metadata")?,
-      created_at: row.try_get("created_at")?,
-      updated_at: row.try_get("updated_at")?,
-    })
-  }
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct StreamMessage {
+  pub jsonrpc: Option<String>,
+  pub method: Option<String>,
+  pub params: Option<Params>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Params {
+  pub result: Option<Result>,
+  pub subscription: i64,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Result {
+  pub context: Option<Context>,
+  pub value: Option<Value>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Context {
+  pub slot: i64,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Value {
+  pub signature: Option<String>,
+  pub logs: Option<Vec<String>>,
 }

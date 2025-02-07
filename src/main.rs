@@ -1,5 +1,6 @@
 mod config;
 mod database;
+mod model;
 mod price_monitor;
 mod telegram;
 mod transaction_processor;
@@ -38,8 +39,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
   let mut stream = Box::pin(stream);
 
   while let Some(message) = stream.next().await {
-    println!("New transaction: {}", message);
-
     // Process transaction
     let signer = Keypair::from_base58_string(&config.private_key);
     let processor = transaction_processor::TransactionProcessor::new(&config.helius_rpc_url);
