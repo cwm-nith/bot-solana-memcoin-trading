@@ -1,8 +1,11 @@
 use serde_json::Value;
-use solana_sdk::signature::{Signature, Signer};
+use solana_sdk::signature::Signer;
 use thiserror::Error;
 
-use crate::model::StreamMessage;
+use crate::{
+  config::Config,
+  model::{StreamMessage, TrxDetailRes},
+};
 
 #[derive(Error, Debug)]
 pub enum TransactionError {
@@ -15,14 +18,12 @@ pub enum TransactionError {
 }
 
 pub struct TransactionProcessor {
-  rpc_url: String,
+  config: Config,
 }
 
 impl TransactionProcessor {
-  pub fn new(rpc_url: &str) -> Self {
-    Self {
-      rpc_url: rpc_url.to_string(),
-    }
+  pub fn new(config: Config) -> Self {
+    Self { config }
   }
 
   pub async fn process_transaction(
@@ -70,10 +71,20 @@ impl TransactionProcessor {
               .iter()
               .find(|x| x.starts_with("Program log: initialize2: InitializeInstruction2"));
             if contains_create.is_some() {
-              println!(
-                "Create pool transaction detected: {}",
-                serde_json::to_string(&data).unwrap()
-              );
+              println!("======================");
+              println!("🔎 New Liquidity Pool found.");
+              println!("🔃 Fetching transaction details...");
+              let signature = signature.as_ref().map_or("", String::as_str);
+              let trx_details = self.fetch_trx_details(signature).await;
+              match trx_details {
+                Ok(trx_details) => {
+                  println!("🔎 Transaction details fetched successfully.");
+                  println!("🔎 Transaction details: {:?}", trx_details);
+                }
+                Err(e) => {
+                  println!("🔎 Error fetching transaction details: {}", e);
+                }
+              }
             }
           }
         }
@@ -82,25 +93,67 @@ impl TransactionProcessor {
     Ok(())
   }
 
-  async fn get_token_metadata(&self, mint_address: &str) -> Result<Value, TransactionError> {
+  async fn fetch_trx_details(&self, signature: &str) -> Result<TrxDetailRes, TransactionError> {
+    let mut count_retry = 0;
     let client = reqwest::Client::new();
-    let response = client
-      .post(&self.rpc_url)
-      .json(&serde_json::json!({
-          "jsonrpc": "2.0",
-          "id": 1,
-          "method": "getAccountInfo",
-          "params": [mint_address, {"encoding": "jsonParsed"}]
-      }))
-      .send()
-      .await
-      .map_err(|e| TransactionError::RpcError(e.to_string()))?;
+    let mut response: TrxDetailRes = vec![];
+    while count_retry < 1 {
+      count_retry += 1;
+      let json = &serde_json::json!({"transactions": [signature]});
+      println!("JSON: {}", json);
 
-    let result: Value = response
-      .json()
-      .await
-      .map_err(|e| TransactionError::RpcError(e.to_string()))?;
+      let url = format!(
+        "{}/transactions/?api-key={}",
+        &self.config.helius_rpc_url, &self.config.helius_api_key
+      );
 
-    Ok(result)
+      println!("URL: {}", url);
+      let res = client.post(url).json(json).send().await;
+
+      response = match res {
+        Ok(res) => {
+          let status = res.status();
+          let response_text = res.text().await;
+          println!("Status: {}", status);
+          match response_text {
+            Ok(text) => serde_json::from_str::<TrxDetailRes>(&text).unwrap(),
+            Err(e) => {
+              println!("Error fetching transaction details: {}", e);
+              continue;
+            }
+          }
+        }
+        Err(e) => {
+          println!("Error fetching transaction details: {}", e);
+          continue;
+        }
+      };
+    }
+
+    println!("Response: {:?}", response);
+
+    Ok(response)
   }
+
+  // async fn get_token_metadata(&self, mint_address: &str) -> Result<Value, TransactionError> {
+  //   let client = reqwest::Client::new();
+  //   let response = client
+  //     .post(&self.rpc_url)
+  //     .json(&serde_json::json!({
+  //         "jsonrpc": "2.0",
+  //         "id": 1,
+  //         "method": "getAccountInfo",
+  //         "params": [mint_address, {"encoding": "jsonParsed"}]
+  //     }))
+  //     .send()
+  //     .await
+  //     .map_err(|e| TransactionError::RpcError(e.to_string()))?;
+
+  //   let result: Value = response
+  //     .json()
+  //     .await
+  //     .map_err(|e| TransactionError::RpcError(e.to_string()))?;
+
+  //   Ok(result)
+  // }
 }
