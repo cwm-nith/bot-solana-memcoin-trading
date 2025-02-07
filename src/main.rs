@@ -6,6 +6,8 @@ mod telegram;
 mod transaction_processor;
 mod websocket;
 
+use std::clone;
+
 use crate::{
   database::Database, price_monitor::PriceMonitor, telegram::TelegramNotifier,
   websocket::SolanaWebsocket,
@@ -41,7 +43,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
   while let Some(message) = stream.next().await {
     // Process transaction
     let signer = Keypair::from_base58_string(&config.private_key);
-    let processor = transaction_processor::TransactionProcessor::new(&config.helius_rpc_url);
+    let processor = transaction_processor::TransactionProcessor::new(config.clone());
 
     // let notifier = notifier.clone();
     if let Err(e) = processor.process_transaction(&message, &signer).await {

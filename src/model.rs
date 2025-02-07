@@ -54,3 +54,111 @@ pub struct Value {
   pub signature: Option<String>,
   pub logs: Option<Vec<String>>,
 }
+
+pub type TrxDetailRes = Vec<TrxDetailRe>;
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct TrxDetailRe {
+  pub description: String,
+
+  #[serde(rename = "type")]
+  pub trx_detail_re_type: String,
+
+  pub source: String,
+
+  pub fee: i64,
+
+  pub fee_payer: String,
+
+  pub signature: String,
+
+  pub slot: i64,
+
+  pub timestamp: i64,
+
+  pub token_transfers: Vec<TokenTransfer>,
+
+  pub native_transfers: Vec<NativeTransfer>,
+
+  pub account_data: Vec<AccountDatum>,
+
+  pub transaction_error: TransactionError,
+
+  pub instructions: Vec<Instruction>,
+
+  pub events: Events,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct AccountDatum {
+  pub account: String,
+
+  pub native_balance_change: i64,
+
+  pub token_balance_changes: Vec<Option<serde_json::Value>>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct Events {}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct Instruction {
+  pub accounts: Vec<String>,
+
+  pub data: String,
+
+  pub program_id: String,
+
+  pub inner_instructions: Option<Vec<Instruction>>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct NativeTransfer {
+  pub from_user_account: String,
+
+  pub to_user_account: String,
+
+  pub amount: i64,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct TokenTransfer {
+  pub from_token_account: String,
+
+  pub to_token_account: String,
+
+  pub from_user_account: String,
+
+  pub to_user_account: String,
+
+  pub token_amount: i64,
+
+  pub mint: String,
+
+  pub token_standard: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "PascalCase")]
+pub struct TransactionError {
+  pub instruction_error: Vec<InstructionErrorElement>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(untagged)]
+pub enum InstructionErrorElement {
+  InstructionErrorClass(InstructionErrorClass),
+
+  Integer(i64),
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "PascalCase")]
+pub struct InstructionErrorClass {
+  pub custom: i64,
+}
