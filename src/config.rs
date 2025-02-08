@@ -1,4 +1,4 @@
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Config {
   pub database_url: String,
   pub telegram_token: String,
@@ -10,6 +10,7 @@ pub struct Config {
 
   pub program_id: String,
   pub private_key: String,
+  pub liquidility_pool_wsol_pc_mint: String,
 }
 impl Config {
   pub fn init() -> Config {
@@ -21,6 +22,8 @@ impl Config {
     let helius_api_key = std::env::var("HELIUS_API_KEY").expect("HELIUS_API_KEY must be set");
     let program_id = std::env::var("PROGRAM_ID").expect("PROGRAM_ID must be set");
     let private_key = std::env::var("PRIVATE_KEY").expect("PRIVATE_KEY must be set");
+    let liquidility_pool_wsol_pc_mint = std::env::var("LIQUIDILITY_POOL_WSOL_PC_MINT")
+      .expect("LIQUIDILITY_POOL_WSOL_PC_MINT must be set");
 
     Config {
       database_url,
@@ -31,6 +34,7 @@ impl Config {
       private_key,
       program_id,
       telegram_chat_id: telegram_chat_id.parse::<i64>().unwrap(),
+      liquidility_pool_wsol_pc_mint,
     }
   }
 }

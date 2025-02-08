@@ -102,10 +102,10 @@ pub struct AccountDatum {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Events {}
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Instruction {
-  pub accounts: Vec<String>,
+  pub accounts: Option<Vec<String>>,
 
   pub data: String,
 
@@ -160,4 +160,10 @@ pub enum InstructionErrorElement {
 #[serde(rename_all = "PascalCase")]
 pub struct InstructionErrorClass {
   pub custom: i64,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct DisplayDataItem {
+  pub token_mint: String,
+  pub sol_mint: String,
 }
