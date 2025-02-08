@@ -1,12 +1,11 @@
 use std::time::Duration;
 
-use serde_json::Value;
 use solana_sdk::signature::Signer;
 use thiserror::Error;
 
 use crate::{
   config::Config,
-  model::{StreamMessage, TrxDetailRes},
+  model::{DisplayDataItem, StreamMessage, TrxDetailRes},
   websocket::SolanaWebsocket,
 };
 
@@ -86,8 +85,7 @@ impl<'a> TransactionProcessor<'a> {
               let trx_details = self.fetch_trx_details(signature).await;
               match trx_details {
                 Ok(trx_details) => {
-                  println!("🔎 Transaction details fetched successfully.");
-                  println!("🔎 Transaction details: {}", trx_details[0].signature);
+                  print!("🔎 Transaction details: {:?}", trx_details);
                 }
                 Err(e) => {
                   println!("🔎 Error fetching transaction details: {}", e);
@@ -101,10 +99,9 @@ impl<'a> TransactionProcessor<'a> {
     Ok(())
   }
 
-  async fn fetch_trx_details(&self, signature: &str) -> Result<TrxDetailRes, TransactionError> {
+  async fn fetch_trx_details(&self, signature: &str) -> Result<DisplayDataItem, TransactionError> {
     let mut count_retry = 0;
     let client = reqwest::Client::new();
-    let mut response: TrxDetailRes = vec![];
     while count_retry < 3 {
       if count_retry > 0 {
         tokio::time::sleep(Duration::from_secs(10)).await;
@@ -123,7 +120,6 @@ impl<'a> TransactionProcessor<'a> {
         &self.config.helius_rpc_url, &self.config.helius_api_key
       );
 
-      println!("URL: {}", url);
       let res = client
         .post(url)
         .header("Content-Type", "application/json")
@@ -131,7 +127,7 @@ impl<'a> TransactionProcessor<'a> {
         .send()
         .await;
 
-      response = match res {
+      let response = match res {
         Ok(res) => {
           let status = res.status();
           let response_text = res.text().await;
@@ -139,11 +135,44 @@ impl<'a> TransactionProcessor<'a> {
 
           match response_text {
             Ok(text) => {
-              let data_trx_details = serde_json::from_str::<TrxDetailRes>(&text).unwrap();
-              if data_trx_details.len() == 0 {
+              let trx_details = serde_json::from_str::<TrxDetailRes>(&text).unwrap();
+              if trx_details.len() == 0 {
                 continue;
               }
-              data_trx_details
+              let mut instructions = trx_details[0].instructions.clone().into_iter();
+              if instructions.len() == 0 {}
+
+              let instruction = instructions.find(|i| i.program_id == self.config.program_id);
+
+              if let Some(instr) = instruction {
+                if let Some(accs) = instr.accounts {
+                  let acc_one = accs[8].to_string();
+                  let acc_two = accs[9].to_string();
+                  let sol_token_acc: String;
+                  let new_token_acc: String;
+                  if acc_one == self.config.liquidility_pool_wsol_pc_mint {
+                    sol_token_acc = acc_one;
+                    new_token_acc = acc_two;
+                  } else {
+                    sol_token_acc = acc_two;
+                    new_token_acc = acc_one;
+                  }
+
+                  let display_data: DisplayDataItem = DisplayDataItem {
+                    sol_mint: sol_token_acc,
+                    token_mint: new_token_acc,
+                  };
+                  display_data
+                } else {
+                  return Err(TransactionError::RpcError(
+                    "Failed to fetch transaction details".to_string(),
+                  ));
+                }
+              } else {
+                return Err(TransactionError::RpcError(
+                  "Failed to fetch transaction details".to_string(),
+                ));
+              }
             }
             Err(e) => {
               println!("Error fetching transaction details: {}", e);
@@ -156,8 +185,11 @@ impl<'a> TransactionProcessor<'a> {
           continue;
         }
       };
+      return Ok(response);
     }
-    Ok(response)
+    Err(TransactionError::RpcError(
+      "Failed to fetch transaction details".to_string(),
+    ))
   }
 
   // async fn get_token_metadata(&self, mint_address: &str) -> Result<Value, TransactionError> {
