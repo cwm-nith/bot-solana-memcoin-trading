@@ -162,8 +162,33 @@ pub struct InstructionErrorClass {
   pub custom: i64,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct DisplayDataItem {
   pub token_mint: String,
   pub sol_mint: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RugCheckRes {
+  pub token_program: String,
+
+  pub token_type: String,
+
+  pub risks: Vec<RugCheckRisk>,
+
+  pub score: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RugCheckRisk {
+  pub name: String,
+
+  pub value: String,
+
+  pub description: String,
+
+  pub score: i64,
+
+  pub level: String,
 }
