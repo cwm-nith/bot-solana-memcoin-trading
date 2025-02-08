@@ -83,8 +83,7 @@ pub struct TrxDetailRe {
 
   pub account_data: Vec<AccountDatum>,
 
-  pub transaction_error: TransactionError,
-
+  pub transaction_error: Option<TransactionError>,
   pub instructions: Vec<Instruction>,
 
   pub events: Events,
@@ -136,7 +135,7 @@ pub struct TokenTransfer {
 
   pub to_user_account: String,
 
-  pub token_amount: i64,
+  pub token_amount: f64,
 
   pub mint: String,
 
