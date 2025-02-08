@@ -1,4 +1,4 @@
-# bot-solana-memcoin-trading
+# bot-solana-memecoin-trading
 
 ## Setup
 
