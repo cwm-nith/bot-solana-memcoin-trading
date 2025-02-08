@@ -6,6 +6,8 @@ use thiserror::Error;
 use crate::{
   config::Config,
   model::{DisplayDataItem, StreamMessage, TrxDetailRes},
+  rug_checker::RugChecker,
+  telegram::TelegramNotifier,
   websocket::SolanaWebsocket,
 };
 
@@ -22,11 +24,16 @@ pub enum TransactionError {
 pub struct TransactionProcessor<'a> {
   config: Config,
   ws: &'a SolanaWebsocket,
+  notifier: &'a TelegramNotifier,
 }
 
 impl<'a> TransactionProcessor<'a> {
-  pub fn new(config: Config, ws: &'a SolanaWebsocket) -> Self {
-    Self { config, ws }
+  pub fn new(config: Config, ws: &'a SolanaWebsocket, notifier: &'a TelegramNotifier) -> Self {
+    Self {
+      config,
+      ws,
+      notifier,
+    }
   }
 
   pub async fn process_transaction(
@@ -86,6 +93,38 @@ impl<'a> TransactionProcessor<'a> {
               match trx_details {
                 Ok(trx_details) => {
                   print!("🔎 Transaction details: {:?}", trx_details);
+                  let rug_checker = RugChecker::new(&self.config);
+                  let is_valid_rug_check =
+                    rug_checker.isvalid_rug_check(&trx_details.token_mint).await;
+
+                  match is_valid_rug_check {
+                    Ok(is_valid) => {
+                      // let trx_details = trx_details.clone();
+                      if is_valid {
+                        println!("🚀 Liquidity Pool is valid.");
+                        _ = self
+                          .notifier
+                          .send_message(&format!(
+                            "🚀 Liquidity Pool is valid. \nTokenMint: {}\n ViewToken: https://gmgn.ai/sol/token/{}",
+                            &trx_details.token_mint, &trx_details.token_mint,
+                          ))
+                          .await;
+                      } else {
+                        println!("🚨 Liquidity Pool is not valid rug check.");
+                        _ = self
+                          .notifier
+                          .send_message(&format!(
+                            "🚨 Liquidity Pool is not valid rug check. \nTokenMint: {}\n ViewToken: https://gmgn.ai/sol/token/{}",
+                            &trx_details.token_mint,
+                            &trx_details.token_mint,
+                          ))
+                          .await;
+                      }
+                    }
+                    Err(e) => {
+                      println!("🔎 Error checking rug pull: {}", e);
+                    }
+                  }
                 }
                 Err(e) => {
                   println!("🔎 Error fetching transaction details: {}", e);

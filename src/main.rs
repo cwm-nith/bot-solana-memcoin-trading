@@ -2,11 +2,10 @@ mod config;
 mod database;
 mod model;
 mod price_monitor;
+mod rug_checker;
 mod telegram;
 mod transaction_processor;
 mod websocket;
-
-use std::clone;
 
 use crate::{
   database::Database, price_monitor::PriceMonitor, telegram::TelegramNotifier,
@@ -43,14 +42,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
   while let Some(message) = stream.next().await {
     // Process transaction
     let signer = Keypair::from_base58_string(&config.private_key);
-    let processor = transaction_processor::TransactionProcessor::new(config.clone(), &websocket);
+    let processor =
+      transaction_processor::TransactionProcessor::new(config.clone(), &websocket, &notifier);
 
     // let notifier = notifier.clone();
     if let Err(e) = processor.process_transaction(&message, &signer).await {
       eprintln!("Error processing transaction: {}", e);
-      notifier
-        .send_message(&format!("Error processing transaction: {}", e))
-        .await?;
     }
   }
 

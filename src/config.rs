@@ -11,7 +11,16 @@ pub struct Config {
   pub program_id: String,
   pub private_key: String,
   pub liquidility_pool_wsol_pc_mint: String,
+  pub rug_checker_url: String,
+  pub rug_check_config: RugCheckConfig,
 }
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct RugCheckConfig {
+  pub signal_holder_ownership: f64,
+  pub not_allowed_risk: Vec<String>,
+}
+
 impl Config {
   pub fn init() -> Config {
     let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
@@ -24,6 +33,7 @@ impl Config {
     let private_key = std::env::var("PRIVATE_KEY").expect("PRIVATE_KEY must be set");
     let liquidility_pool_wsol_pc_mint = std::env::var("LIQUIDILITY_POOL_WSOL_PC_MINT")
       .expect("LIQUIDILITY_POOL_WSOL_PC_MINT must be set");
+    let rug_checker_url = std::env::var("RUG_CHECKER_URL").expect("RUG_CHECKER_URL must be set");
 
     Config {
       database_url,
@@ -35,6 +45,15 @@ impl Config {
       program_id,
       telegram_chat_id: telegram_chat_id.parse::<i64>().unwrap(),
       liquidility_pool_wsol_pc_mint,
+      rug_checker_url,
+      rug_check_config: RugCheckConfig {
+        signal_holder_ownership: 0 as f64,
+        not_allowed_risk: vec![
+          "Freeze Authority still enabled".to_string(),
+          "Large Amount of LP Unlocked".to_string(),
+          "Copycat token".to_string(),
+        ],
+      },
     }
   }
 }
