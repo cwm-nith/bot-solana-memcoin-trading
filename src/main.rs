@@ -7,12 +7,15 @@ mod telegram;
 mod transaction_processor;
 mod websocket;
 
+use std::time::Duration;
+
 use crate::{
   database::Database, price_monitor::PriceMonitor, telegram::TelegramNotifier,
   websocket::SolanaWebsocket,
 };
 use futures::StreamExt;
 use solana_sdk::signer::keypair::Keypair;
+use tokio::time::sleep;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -38,18 +41,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     .await?;
 
   let mut stream = Box::pin(stream);
+  loop {
+    if let Some(message) = stream.next().await {
+      // Process transaction
+      let signer = Keypair::from_base58_string(&config.private_key);
+      let processor =
+        transaction_processor::TransactionProcessor::new(config.clone(), &websocket, &notifier);
 
-  while let Some(message) = stream.next().await {
-    // Process transaction
-    let signer = Keypair::from_base58_string(&config.private_key);
-    let processor =
-      transaction_processor::TransactionProcessor::new(config.clone(), &websocket, &notifier);
-
-    // let notifier = notifier.clone();
-    if let Err(e) = processor.process_transaction(&message, &signer).await {
-      eprintln!("Error processing transaction: {}", e);
+      // let notifier = notifier.clone();
+      if let Err(e) = processor.process_transaction(&message, &signer).await {
+        eprintln!("Error processing transaction: {}", e);
+      }
+    } else {
+      eprintln!("Socket error, retry to connect");
+      let wait_time = Duration::from_secs(10); // Max 32s delay
+      sleep(wait_time).await;
     }
   }
-
-  Ok(())
 }

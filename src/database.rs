@@ -30,7 +30,7 @@ impl Database {
     Ok(Self { pool })
   }
 
-  pub async fn save_transaction(&self, record: &TokenRecord) -> Result<(), DatabaseError> {
+  pub async fn _save_transaction(&self, record: &TokenRecord) -> Result<(), DatabaseError> {
     sqlx::query!(
       r#"
             INSERT INTO tokens 

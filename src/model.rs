@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 //   pub updated_at: Option<DateTime<Utc>>,
 // }
 
-#[derive(sqlx::FromRow, Debug)]
+#[derive(sqlx::FromRow, Debug, Serialize, Deserialize, Clone)]
 pub struct TokenRecord {
   pub id: i64,
   pub mint_address: String,
@@ -191,4 +191,66 @@ pub struct RugCheckRisk {
   pub score: i64,
 
   pub level: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct QouteResponse {
+  pub input_mint: String,
+
+  pub in_amount: String,
+
+  pub output_mint: String,
+
+  pub out_amount: String,
+
+  pub other_amount_threshold: String,
+
+  pub swap_mode: String,
+
+  pub slippage_bps: i64,
+
+  pub platform_fee: Option<serde_json::Value>,
+
+  pub price_impact_pct: String,
+
+  pub route_plan: Vec<RoutePlan>,
+
+  pub score_report: Option<serde_json::Value>,
+
+  pub context_slot: i64,
+
+  pub time_taken: f64,
+
+  pub swap_usd_value: String,
+
+  pub simpler_route_used: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RoutePlan {
+  pub swap_info: SwapInfo,
+
+  pub percent: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SwapInfo {
+  pub amm_key: String,
+
+  pub label: String,
+
+  pub input_mint: String,
+
+  pub output_mint: String,
+
+  pub in_amount: String,
+
+  pub out_amount: String,
+
+  pub fee_amount: String,
+
+  pub fee_mint: String,
 }

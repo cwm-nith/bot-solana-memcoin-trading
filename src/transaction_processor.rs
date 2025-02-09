@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use solana_sdk::signature::Signer;
+use solana_sdk::signature::{Keypair, Signer};
 use thiserror::Error;
 
 use crate::{
@@ -13,8 +13,8 @@ use crate::{
 
 #[derive(Error, Debug)]
 pub enum TransactionError {
-  #[error("Invalid transaction format")]
-  InvalidTransaction,
+  #[error("Invalid transaction format: {0}")]
+  InvalidTransaction(String),
   #[error("Signature verification failed")]
   SignatureError,
   #[error("RPC error: {0}")]
@@ -23,17 +23,12 @@ pub enum TransactionError {
 
 pub struct TransactionProcessor<'a> {
   config: Config,
-  ws: &'a SolanaWebsocket,
   notifier: &'a TelegramNotifier,
 }
 
 impl<'a> TransactionProcessor<'a> {
-  pub fn new(config: Config, ws: &'a SolanaWebsocket, notifier: &'a TelegramNotifier) -> Self {
-    Self {
-      config,
-      ws,
-      notifier,
-    }
+  pub fn new(config: Config, _ws: &'a SolanaWebsocket, notifier: &'a TelegramNotifier) -> Self {
+    Self { config, notifier }
   }
 
   pub async fn process_transaction(
@@ -65,7 +60,6 @@ impl<'a> TransactionProcessor<'a> {
     // }
 
     let data = serde_json::from_str::<StreamMessage>(tx_data).unwrap();
-
     if let Some(params) = &data.params {
       if let Some(result) = &params.result {
         if let Some(value) = &result.value {
@@ -81,8 +75,6 @@ impl<'a> TransactionProcessor<'a> {
               .iter()
               .find(|x| x.starts_with("Program log: initialize2: InitializeInstruction2"));
             if contains_create.is_some() {
-              self.ws.close();
-
               println!("======================");
               println!("🔎 New Liquidity Pool found.");
               println!("Puase WS for handle transaction");
@@ -101,6 +93,14 @@ impl<'a> TransactionProcessor<'a> {
                     Ok(is_valid) => {
                       // let trx_details = trx_details.clone();
                       if is_valid {
+                        if trx_details.token_mint.trim().ends_with("pump")
+                          && self.config.rug_check_config.is_skip_pump_token
+                        {
+                          return Err(TransactionError::RpcError(
+                            "Pump token is not allowed".to_string(),
+                          ));
+                        }
+
                         println!("🚀 Liquidity Pool is valid.");
                         _ = self
                           .notifier
@@ -109,25 +109,24 @@ impl<'a> TransactionProcessor<'a> {
                             &trx_details.token_mint, &trx_details.token_mint,
                           ))
                           .await;
-                      } else {
-                        println!("🚨 Liquidity Pool is not valid rug check.");
                         _ = self
-                          .notifier
-                          .send_message(&format!(
+                          .create_swap_trx(&trx_details.sol_mint, &trx_details.token_mint)
+                          .await;
+                      } else {
+                        return Err(TransactionError::RpcError(format!(
                             "🚨 Liquidity Pool is not valid rug check. \nTokenMint: {}\n ViewToken: https://gmgn.ai/sol/token/{}",
                             &trx_details.token_mint,
                             &trx_details.token_mint,
-                          ))
-                          .await;
+                          )));
                       }
                     }
                     Err(e) => {
-                      println!("🔎 Error checking rug pull: {}", e);
+                      return Err(TransactionError::RpcError(e.to_string()));
                     }
                   }
                 }
                 Err(e) => {
-                  println!("🔎 Error fetching transaction details: {}", e);
+                  return Err(TransactionError::RpcError(e.to_string()));
                 }
               }
             }
@@ -229,6 +228,94 @@ impl<'a> TransactionProcessor<'a> {
     Err(TransactionError::RpcError(
       "Failed to fetch transaction details".to_string(),
     ))
+  }
+
+  async fn create_swap_trx(
+    &self,
+    sol_mint: &str,
+    token_mint: &str,
+  ) -> Result<(), TransactionError> {
+    let private_key_bytes = bs58::decode(&self.config.private_key)
+      .into_vec()
+      .expect("Failed to decode base58");
+    let keypair = Keypair::from_bytes(&private_key_bytes).expect("Failed to create Keypair");
+
+    let client = reqwest::Client::new();
+    let jupiter_qoute_url = format!(
+      "{}/quote?inputMint={}&outputMint={}&amount={}&slippageBps={}",
+      &self.config.jupiter_url,
+      sol_mint,
+      token_mint,
+      self.config.swap_config.amount,
+      self.config.swap_config.slippage_bps
+    );
+    let jupiter_swap_url = format!("{}/swap", &self.config.jupiter_url);
+
+    let qoute_res = client
+      .get(jupiter_qoute_url)
+      .header("Content-Type", "application/json")
+      .send()
+      .await;
+
+    match qoute_res {
+      Ok(res) => {
+        let status = res.status();
+        let response_text = res.text().await;
+        println!("Status: {}", status);
+        match response_text {
+          Ok(txt) => {
+            println!("qoute res: {}", txt);
+            let swap_json_req = serde_json::json!({
+                // quoteResponse from /quote api
+                "quoteResponse": txt,
+                // user public key to be used for the swap
+                "userPublicKey": keypair.pubkey().to_string(),
+                // auto wrap and unwrap SOL. default is true
+                "wrapAndUnwrapSol": true,
+                // dynamicComputeUnitLimit: true // allow dynamic compute limit instead of max 1,400,000
+                "dynamicSlippage": {
+                  // This will set an optimized slippage to ensure high success rate
+                  "maxBps": 3000, // Make sure to set a reasonable cap here to prevent MEV
+                },
+                "prioritizationFeeLamports": {
+                  "prioritizationLevelWithMaxLamports": {
+                    "maxLamports": 1000000,
+                    "priorityLevel": "veryHigh", // If you want to land transactions fase, set this to use `veryHigh`
+                  },
+                },
+            });
+
+            println!("swap_json_req: {:?}", &swap_json_req);
+            let swap_res = client
+              .post(jupiter_swap_url)
+              .header("Content-Type", "application/json")
+              .json(&swap_json_req)
+              .send()
+              .await;
+
+            match swap_res {
+              Ok(s_res) => {
+                let swap_status = s_res.status();
+                let swap_res_txt = s_res.text().await;
+                println!("Swap Status: {}", swap_status);
+                match swap_res_txt {
+                  Ok(s_txt) => {
+                    println!("swap res: {}", s_txt);
+                  }
+                  Err(e) => return Err(TransactionError::InvalidTransaction(e.to_string())),
+                }
+              }
+              Err(e) => return Err(TransactionError::InvalidTransaction(e.to_string())),
+            }
+          }
+          Err(e) => return Err(TransactionError::InvalidTransaction(e.to_string())),
+        }
+      }
+      Err(e) => return Err(TransactionError::InvalidTransaction(e.to_string())),
+    }
+
+    println!("Public Key: {}", keypair.pubkey());
+    Ok(())
   }
 
   // async fn get_token_metadata(&self, mint_address: &str) -> Result<Value, TransactionError> {

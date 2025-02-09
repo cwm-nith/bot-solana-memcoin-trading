@@ -1,12 +1,6 @@
-use std::sync::Arc;
-
 use futures::{SinkExt, Stream, StreamExt};
 use serde_json;
 use thiserror::Error;
-use tokio::{
-  sync::{watch, Mutex},
-  time::{sleep, Duration},
-};
 use tokio_tungstenite::tungstenite::{protocol::Message, Bytes};
 
 #[derive(Error, Debug)]
@@ -20,29 +14,14 @@ pub enum WebsocketError {
 pub struct SolanaWebsocket {
   ws_url: String,
   api_key: String,
-  stop_signal: Arc<watch::Sender<bool>>,
 }
 
 impl SolanaWebsocket {
   pub fn new(ws_url: &str, api_key: &str) -> Self {
-    let (stop_signal, _) = watch::channel(false);
     Self {
       ws_url: ws_url.to_string(),
       api_key: api_key.to_string(),
-      stop_signal: Arc::new(stop_signal),
     }
-  }
-
-  /// **Closes the WebSocket manually**
-  pub fn close(&self) {
-    let _ = self.stop_signal.send(true);
-    println!("WebSocket manually closed.");
-  }
-
-  /// **Restarts the WebSocket connection**
-  pub fn restart(&self) {
-    let _ = self.stop_signal.send(false); // Reset stop signal
-    println!("🔄 Restarting WebSocket...");
   }
 
   pub async fn listen_for_pool_creation(
@@ -88,72 +67,61 @@ impl SolanaWebsocket {
     //   }
     // }))
     let url_string = format!("{}/?api-key={}", self.ws_url, &self.api_key);
-    let mut retry_attempts = 0;
-    let stop_receiver = self.stop_signal.subscribe();
 
-    loop {
-      if *stop_receiver.borrow() {
-        println!("🛑 Stopping WebSocket connection...");
-        return Err(WebsocketError::ConnectionError(
-          "WebSocket closed manually.".into(),
-        ));
-      }
+    match tokio_tungstenite::connect_async(&url_string).await {
+      Ok((ws_stream, _)) => {
+        let (mut write, read) = ws_stream.split();
 
-      match tokio_tungstenite::connect_async(&url_string).await {
-        Ok((ws_stream, _)) => {
-          let (mut write, read) = ws_stream.split();
+        let subscribe_message = serde_json::json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "logsSubscribe",
+            "params": [
+                {"mentions": [wallet_address]},
+                {"commitment": "processed"}
+            ]
+        });
 
-          let subscribe_message = serde_json::json!({
-              "jsonrpc": "2.0",
-              "id": 1,
-              "method": "logsSubscribe",
-              "params": [
-                  {"mentions": [wallet_address]},
-                  {"commitment": "processed"}
-              ]
-          });
+        let subscribe_message_str = serde_json::to_string(&subscribe_message).map_err(|e| {
+          WebsocketError::SubscriptionError(format!("Error serializing message: {}", e))
+        })?;
 
-          let subscribe_message_str = serde_json::to_string(&subscribe_message).map_err(|e| {
-            WebsocketError::SubscriptionError(format!("Error serializing message: {}", e))
-          })?;
+        let subscribe_message_bytes = subscribe_message_str.into_bytes();
 
-          let subscribe_message_bytes = subscribe_message_str.into_bytes();
+        if let Err(e) = write
+          .send(Message::Binary(Bytes::from(subscribe_message_bytes)))
+          .await
+        {
+          return Err(WebsocketError::SubscriptionError(format!(
+            "Error sending subscription: {}",
+            e
+          )));
+        }
+        println!("✅ WebSocket connected successfully!");
 
-          if let Err(e) = write
-            .send(Message::Binary(Bytes::from(subscribe_message_bytes)))
-            .await
-          {
-            return Err(WebsocketError::SubscriptionError(format!(
-              "Error sending subscription: {}",
-              e
-            )));
-          }
-          println!("✅ WebSocket connected successfully!");
-
-          return Ok(read.filter_map(|msg| async {
-            match msg {
-              Ok(Message::Text(text)) => {
-                let str = text.to_string();
-                Some(str)
-              } // `Message::Text` is already a `String`
-              Ok(Message::Close(_)) => {
-                println!("⚠️ WebSocket closed. Reconnecting...");
-                None
-              }
-              Err(e) => {
-                println!("❌ WebSocket error: {}. Reconnecting...", e);
-                None
-              }
-              _ => None,
+        return Ok(read.filter_map(|msg| async {
+          match msg {
+            Ok(Message::Text(text)) => {
+              let str = text.to_string();
+              Some(str)
+            } // `Message::Text` is already a `String`
+            Ok(Message::Close(_)) => {
+              println!("⚠️ WebSocket closed. Reconnecting...");
+              // self.restart();
+              None
             }
-          }));
-        }
-        Err(e) => {
-          println!("🔄 Failed to connect: {}. Retrying...", e);
-          retry_attempts += 1;
-          let wait_time = Duration::from_secs(2u64.pow(retry_attempts.min(5))); // Max 32s delay
-          sleep(wait_time).await;
-        }
+            Err(e) => {
+              println!("❌ WebSocket error: {}. Reconnecting...", e);
+              // self.restart();
+              None
+            }
+            _ => None,
+          }
+        }));
+      }
+      Err(e) => {
+        println!("🔄 Failed to connect: {}. Retrying...", e);
+        return Err(WebsocketError::ConnectionError(e.to_string()));
       }
     }
   }
