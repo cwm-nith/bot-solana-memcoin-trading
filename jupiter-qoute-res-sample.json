@@ -1,0 +1,31 @@
+{
+  "inputMint": "So11111111111111111111111111111111111111112",
+  "inAmount": "10000000000",
+  "outputMint": "72GbaARtT7nn6kVpXVvk5vkJWSmbsB4UWyCV9ALqSUTt",
+  "outAmount": "18814040356",
+  "otherAmountThreshold": "18437759549",
+  "swapMode": "ExactIn",
+  "slippageBps": 200,
+  "platformFee": null,
+  "priceImpactPct": "0.1253258325222518629770670564",
+  "routePlan": [
+    {
+      "swapInfo": {
+        "ammKey": "8TMu2HmdSfSmSh3koqMT7ZHzmMmnaVeW21EnBjfXodGA",
+        "label": "Raydium",
+        "inputMint": "So11111111111111111111111111111111111111112",
+        "outputMint": "72GbaARtT7nn6kVpXVvk5vkJWSmbsB4UWyCV9ALqSUTt",
+        "inAmount": "10000000000",
+        "outAmount": "18814040356",
+        "feeAmount": "25000000",
+        "feeMint": "So11111111111111111111111111111111111111112"
+      },
+      "percent": 100
+    }
+  ],
+  "scoreReport": null,
+  "contextSlot": 319414943,
+  "timeTaken": 0.020167568,
+  "swapUsdValue": "2015.9759237640157450138817078",
+  "simplerRouteUsed": false
+}

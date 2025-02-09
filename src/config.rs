@@ -13,12 +13,21 @@ pub struct Config {
   pub liquidility_pool_wsol_pc_mint: String,
   pub rug_checker_url: String,
   pub rug_check_config: RugCheckConfig,
+  pub swap_config: SwapConfig,
+  pub jupiter_url: String,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct RugCheckConfig {
   pub signal_holder_ownership: f64,
   pub not_allowed_risk: Vec<String>,
+  pub is_skip_pump_token: bool,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct SwapConfig {
+  pub amount: String, // lamports
+  pub slippage_bps: String,
 }
 
 impl Config {
@@ -34,6 +43,7 @@ impl Config {
     let liquidility_pool_wsol_pc_mint = std::env::var("LIQUIDILITY_POOL_WSOL_PC_MINT")
       .expect("LIQUIDILITY_POOL_WSOL_PC_MINT must be set");
     let rug_checker_url = std::env::var("RUG_CHECKER_URL").expect("RUG_CHECKER_URL must be set");
+    let jupiter_url = std::env::var("JUPITER_URL").expect("JUPITER_URL must be set");
 
     Config {
       database_url,
@@ -53,7 +63,13 @@ impl Config {
           "Large Amount of LP Unlocked".to_string(),
           "Copycat token".to_string(),
         ],
+        is_skip_pump_token: true,
       },
+      swap_config: SwapConfig {
+        amount: "10000000000".to_string(), // 0.01 SOL = 10000000000 lamports
+        slippage_bps: "200".to_string(),
+      },
+      jupiter_url,
     }
   }
 }
